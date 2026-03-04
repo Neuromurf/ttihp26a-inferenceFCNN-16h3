@@ -9,12 +9,12 @@ You can also include images in this folder and reference them in the markdown. E
 
 ## How it works
 
-Explain how your project works
+ This project is a sequential AI accelerator designed for on-chip full connected neural network inference of MNIST dataset. The design architecutre consists of three main mdoules: top-level wrapper, 11-state control FSM and arithmetic datapath module.
 
 ## How to test
 
-Explain how to use your project
+Interface with MCU (e.g., TT on-board RP2040/RP2350 MCU), assert 'rst_n' LOW, start MAC, send data (either weights or test values) through ui_in pins (controll data type throuhg 'data_type' and 'data_toggle' pins) and 10 class classification result at output pin in 4-bit format. 
 
 ## External hardware
 
-List external hardware used in your project (e.g. PMOD, LED display, etc), if any
+RP2040/RP2350 or any other MCU for feed pre-trained weights and inputs to the ASIC. For example, using TinyTapeout demo board for convenient interfacing.

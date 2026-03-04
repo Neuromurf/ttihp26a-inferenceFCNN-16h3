@@ -1,56 +1,59 @@
 # Tiny Tapeout project information
 project:
-  title:        ""      # Project title
-  author:       ""      # Your name
-  discord:      ""      # Your discord username, for communication and automatically assigning you a Tapeout role (optional)
-  description:  ""      # One line description of what your project does
-  language:     "Verilog" # other examples include SystemVerilog, Amaranth, VHDL, etc
-  clock_hz:     0       # Clock frequency in Hz (or 0 if not applicable)
+  title:        "SEQ_MAC_INF_16H3 - Neural Network Inference Accelerator"
+  author:       "Neuromurf"
+  discord:      ""
+  description:  "8-bit sequential MAC with autonomous MNIST inference"
+  language:     "Verilog"
+  clock_hz:     50000000  # 50 MHz
 
   # How many tiles your design occupies? A single tile is about 167x108 uM.
-  tiles: "1x1"          # Valid values: 1x1, 1x2, 2x2, 3x2, 4x2, 6x2 or 8x2
+  tiles: "1x2"
 
   # Your top module name must start with "tt_um_". Make it unique by including your github username:
-  top_module:  "tt_um_example"
+  top_module:  "tt_um_neuromurf_seq_mac_inf"
 
   # List your project's source files here.
   # Source files must be in ./src and you must list each source file separately, one per line.
-  # Don't forget to also update `PROJECT_SOURCES` in test/Makefile.
   source_files:
-    - "project.v"
+    - "tt_um_neuromurf_seq_mac_inf.v"
+    - "seq_mac_inf_top.v"
+    - "seq_mac_inf_fsm.v"
+    - "seq_mac_datapath.v"
+    - "hidden_reg_bank.v"
+    - "argmax_unit.v"
 
 # The pinout of your project. Leave unused pins blank. DO NOT delete or add any pins.
-# This section is for the datasheet/website. Use descriptive names (e.g., RX, TX, MOSI, SCL, SEG_A, etc.).
 pinout:
   # Inputs
-  ui[0]: ""
-  ui[1]: ""
-  ui[2]: ""
-  ui[3]: ""
-  ui[4]: ""
-  ui[5]: ""
-  ui[6]: ""
-  ui[7]: ""
+  ui[0]: "data_in[0]"
+  ui[1]: "data_in[1]"
+  ui[2]: "data_in[2]"
+  ui[3]: "data_in[3]"
+  ui[4]: "data_in[4]"
+  ui[5]: "data_in[5]"
+  ui[6]: "data_in[6]"
+  ui[7]: "data_in[7]"
 
   # Outputs
-  uo[0]: ""
-  uo[1]: ""
-  uo[2]: ""
-  uo[3]: ""
-  uo[4]: ""
-  uo[5]: ""
-  uo[6]: ""
-  uo[7]: ""
+  uo[0]: "result[0] / busy"
+  uo[1]: "result[1] / done"
+  uo[2]: "result[2] / ready"
+  uo[3]: "result[3] / byte_valid"
+  uo[4]: "best_class[0] / inf_done"
+  uo[5]: "best_class[1] / layer"
+  uo[6]: "best_class[2] / err_flag"
+  uo[7]: "best_class[3] / reserved"
 
   # Bidirectional pins
-  uio[0]: ""
-  uio[1]: ""
-  uio[2]: ""
-  uio[3]: ""
-  uio[4]: ""
-  uio[5]: ""
-  uio[6]: ""
-  uio[7]: ""
+  uio[0]: "data_toggle"
+  uio[1]: "data_type"
+  uio[2]: "start"
+  uio[3]: "mode[0]"
+  uio[4]: "next_byte"
+  uio[5]: "soft_rst"
+  uio[6]: "mode[1]"
+  uio[7]: "status_sel"
 
 # Do not change!
 yaml_version: 6

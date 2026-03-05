@@ -3,7 +3,6 @@
 
 # defaults
 SIM ?= icarus
-FST ?= -fst # Use more efficient FST format
 TOPLEVEL_LANG ?= verilog
 SRC_DIR = $(PWD)/../src
 PROJECT_SOURCES = tt_um_neuromurf_seq_mac_inf.v seq_mac_inf_top.v seq_mac_inf_fsm.v seq_mac_datapath.v hidden_reg_bank.v argmax_unit.v
@@ -21,6 +20,7 @@ SIM_BUILD				= sim_build/gl
 COMPILE_ARGS    += -DGL_TEST
 COMPILE_ARGS    += -DFUNCTIONAL
 COMPILE_ARGS    += -DSIM
+COMPILE_ARGS    += -DUNIT_DELAY=\#1
 VERILOG_SOURCES += $(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_io/verilog/sg13g2_io.v
 VERILOG_SOURCES += $(PDK_ROOT)/ihp-sg13g2/libs.ref/sg13g2_stdcell/verilog/sg13g2_stdcell.v
 # this gets copied in by the GDS action workflow
@@ -36,7 +36,7 @@ VERILOG_SOURCES += $(PWD)/tb.v
 
 TOPLEVEL = tb
 
-# Test module (basename of Python test file without .py):
+# MODULE is the basename of the Python test file
 MODULE = test
 
 # include cocotb's make rules to take care of the simulator setup

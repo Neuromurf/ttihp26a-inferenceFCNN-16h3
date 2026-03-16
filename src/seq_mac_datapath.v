@@ -35,7 +35,7 @@ module seq_mac_datapath (
     //==========================================================================
     // Data Outputs
     //==========================================================================
-    output wire [24:0] acc_out,       // Signed accumulator for ReLU/argmax
+    output wire [25:0] acc_out,       // Signed accumulator for ReLU/argmax (26-bit)
     output wire [7:0]  result_byte    // Current result byte (MAC_ONLY mode)
 );
 
@@ -61,8 +61,8 @@ module seq_mac_datapath (
     // Final signed product after sign correction
     reg [16:0] final_prod;     // 17-bit signed product
     
-    // Accumulator (25-bit signed)
-    reg signed [24:0] acc_reg;
+    // Accumulator (26-bit signed)
+    reg signed [25:0] acc_reg;
     
     // Output shift register (for MAC_ONLY 3-byte readout)
     reg [23:0] out_shift_reg;
@@ -143,18 +143,22 @@ module seq_mac_datapath (
     assign mult_done = mult_done_reg;
 
     //==========================================================================
-    // Signed Accumulator (25-bit)
+    // Signed Accumulator (26-bit)
     //==========================================================================
+    // 26 bits provides safe headroom for 785 accumulations:
+    //   Max positive: 785 × 127 × 255 = 25,400,325 (fits in 26 bits signed)
+    //   Max negative: 785 × (-128) × 255 = -25,600,800 (fits in 26 bits signed)
+    //
     
-    // Sign-extend 17-bit product to 25 bits
-    wire signed [24:0] product_sext = {{8{final_prod[16]}}, final_prod};
+    // Sign-extend 17-bit product to 26 bits
+    wire signed [25:0] product_sext = {{9{final_prod[16]}}, final_prod};
     
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
-            acc_reg <= 25'sd0;
+            acc_reg <= 26'sd0;
         end else if (ena) begin
             if (acc_clear) begin
-                acc_reg <= 25'sd0;
+                acc_reg <= 26'sd0;
             end else if (acc_add) begin
                 acc_reg <= acc_reg + product_sext;
             end

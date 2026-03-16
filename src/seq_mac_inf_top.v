@@ -8,53 +8,6 @@
 //  Description: Top-level integration with CDC, ReLU, muxes, and submodules
 //
 //==============================================================================
-//
-//  OVERVIEW
-//  --------
-//  Integrates all submodules for neural network inference:
-//  • Datapath:    Signed-unsigned serial MAC (8 cycles per multiply)
-//  • FSM:         Control for MAC_ONLY and INFERENCE modes
-//  • Hidden Bank: 16 × 8-bit register file for hidden activations
-//  • Argmax:      Winner-take-all signed comparison
-//  • ReLU:        Rectified linear unit (clamp negative to zero)
-//
-//  NETWORK
-//  -------
-//  785 → 16 → 10 (MNIST with folded bias)
-//  • Signed 8-bit weights
-//  • Unsigned 8-bit inputs/activations
-//  • Signed 25-bit accumulator
-//  • ReLU activation between layers
-//
-//  PIN MAPPING
-//  -----------
-//  ui_in[7:0]   - Data bus (weights: signed, inputs: unsigned)
-//  uio_in[0]    - data_toggle: Toggle any edge for data transfer
-//  uio_in[1]    - data_type:   0=weight, 1=input (Layer 1 only)
-//  uio_in[2]    - start:       Pulse to begin operation
-//  uio_in[3]    - mode[0]:     Operating mode bit 0
-//  uio_in[4]    - next_byte:   Shift result (MAC_ONLY mode)
-//  uio_in[5]    - soft_rst:    Synchronous reset
-//  uio_in[6]    - mode[1]:     Operating mode bit 1
-//  uio_in[7]    - status_sel:  0=result/class, 1=status
-//
-//  STATUS BYTE (uo_out when status_sel=1)
-//  --------------------------------------
-//  [0] busy       - Operation in progress
-//  [1] done       - MAC_ONLY output phase
-//  [2] ready      - Ready for data
-//  [3] byte_valid - Valid result byte available
-//  [4] inf_done   - Inference complete
-//  [5] layer      - Current layer: 0=L1, 1=L2
-//  [6] err_flag   - Protocol error
-//  [7] reserved   - Always 0
-//
-//  CDC FIX
-//  -------
-//  Data (ui_in) is captured on toggle edge detection in the CDC chain.
-//  This ensures data is stable when FSM processes it 1 cycle later.
-//
-//==============================================================================
 
 module seq_mac_inf_top (
     //==========================================================================
@@ -93,9 +46,6 @@ module seq_mac_inf_top (
     //==========================================================================
     // CDC Synchronizers (2-FF)
     //==========================================================================
-    // Synchronize control signals from RP2040 to internal clock domain
-    // Prevents metastability from asynchronous control inputs
-    //
     
     reg [1:0] toggle_sync;
     reg [1:0] start_sync;
@@ -121,7 +71,6 @@ module seq_mac_inf_top (
     
     // Synchronized signals
     wire       data_toggle = toggle_sync[1];
-    // Note: data_type not used - we use type_captured from edge detection
     wire       start       = start_sync[1];
     wire [1:0] mode        = {mode1_sync[1], mode0_sync[1]};
     wire       next_byte   = next_sync[1];
@@ -129,12 +78,6 @@ module seq_mac_inf_top (
     //==========================================================================
     // Data Capture on RAW Toggle Edge (CDC FIX)
     //==========================================================================
-    // Capture ui_in when toggle edge arrives at RAW input (before CDC).
-    // This ensures data is captured in the SAME cycle the toggle arrives,
-    // while ui_in is still valid.
-    //
-    // The captured data then flows through the CDC-synchronized FSM.
-    //
     
     reg toggle_raw_prev;
     
@@ -196,8 +139,8 @@ module seq_mac_inf_top (
     wire        layer;
     wire        err_flag;
     
-    // Datapath outputs
-    wire [24:0] acc_value;       // Signed accumulator (25-bit)
+    // Datapath outputs (26-bit accumulator)
+    wire [25:0] acc_value;
     wire [7:0]  result_byte;
     
     // Hidden bank
@@ -207,19 +150,15 @@ module seq_mac_inf_top (
     wire [3:0]  best_class;
 
     //==========================================================================
-    // ReLU Activation with Rounding
+    // ReLU Activation with Rounding (26-bit accumulator)
     //==========================================================================
     // Applies ReLU to signed accumulator:
     //   if (acc < 0) output = 0
     //   else         output = round(acc / 256) with saturation
     //
-    // Rounding: Add bit 7 (MSB of discarded bits) to round to nearest
-    //           acc[7] = 1 means fractional part >= 0.5, so round up
-    // Saturation: Clamp to 255 if overflow
-    //
     
-    wire acc_negative = acc_value[24];  // Sign bit (25-bit accumulator)
-    wire acc_overflow = |acc_value[23:16];  // Overflow if upper bits set (positive case)
+    wire acc_negative = acc_value[25];  // Sign bit (26-bit accumulator)
+    wire acc_overflow = |acc_value[24:16];  // Overflow if upper bits set (positive case)
     
     // Rounding logic: add 0.5 (bit 7) before shifting
     wire [8:0] acc_rounded = {1'b0, acc_value[15:8]} + {8'b0, acc_value[7]};
@@ -231,9 +170,6 @@ module seq_mac_inf_top (
     //==========================================================================
     // Input Data Mux
     //==========================================================================
-    // Use captured data for weight/input (robust to CDC timing)
-    // During Layer 2, use hidden bank output as input data
-    //
     
     wire [7:0] mac_input_data = (input_load && use_hidden) ? hidden_rd_data : data_captured;
 
@@ -268,7 +204,7 @@ module seq_mac_inf_top (
         .mode          (mode),
         .start         (start),
         .data_toggle   (data_toggle),
-        .data_type     (type_captured),  // Use captured type
+        .data_type     (type_captured),
         .next_byte     (next_byte),
         .mult_done     (mult_done),
         .weight_load   (weight_load),
@@ -325,9 +261,6 @@ module seq_mac_inf_top (
     //==========================================================================
     // Output Mux
     //==========================================================================
-    // status_sel=0: Result byte (MAC_ONLY) or best_class (INFERENCE)
-    // status_sel=1: Status byte
-    //
     
     wire [7:0] status_byte = {
         1'b0,       // [7] reserved
@@ -347,9 +280,6 @@ module seq_mac_inf_top (
     //==========================================================================
     // Bidirectional Pin Control
     //==========================================================================
-    // uio pins are configured as inputs (directly from uio_in direction)
-    // Set uio_oe to 0 (input mode) and uio_out to 0 (no drive)
-    //
     assign uio_oe  = 8'b00000000;  // All pins are inputs
     assign uio_out = 8'b00000000;  // No output drive
 
